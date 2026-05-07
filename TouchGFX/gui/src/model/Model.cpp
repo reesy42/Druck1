@@ -2,8 +2,7 @@
 #include <gui/model/ModelListener.hpp>
 #include <touchgfx/hal/HAL.hpp>
 #include "../../include/gui/model/Model.hpp"
-#include "ms5525dso.h"     // C-Treiber einbinden
-extern "C" MS5525_Handle_t ms5525;   // globale Instanz aus main.c
+#include "main.h"     // g_pressure_mbar, g_temp_degc
 
 #ifdef SIMULATOR
 #include <ctime>
@@ -67,32 +66,11 @@ void Model::tick()
 
 	    tickCounter_++;
 
-	   // Alle 20 Ticks (~333 ms bei 60 Hz) eine neue Messung starten
-	   if (tickCounter_ % 40 == 0)
-	   {
-	      if (MS5525_Read(&ms5525, MS5525_OSR_4096) == HAL_OK)
-	      {
-	          pressureMbar_ = MS5525_GetPressure_mbar(&ms5525);
-	          tempDegC_     = (float)MS5525_GetTemperature_mDegC(&ms5525) / 1000.0f;
-	      }
-	   }
+	    // Sensor-Werte aus defaultTask lesen (alle ~40ms aktualisiert)
+	    pressureMbar_ = g_pressure_mbar;
+	    tempDegC_     = g_temp_degc;
 
-	//   if (tickCounter_ % 10 == 0)
-	//   {
-	//		 switch(MessState){
-	//			 case 0: break; //Druckmessung starten
-	//			 case 1: break; //Druckmessung aufnehmen, Temperaturmessung starten
-	//			 case 2: break;//Temperaturmessung auswerten,Druck berechnen,in Variablen schreiben
-	//			 default : break;
-	//		 }
-	//		 MessState +=1;if(MessState >= 3)MessState =0;
-	//      if (MS5525_Read(&ms5525, MS5525_OSR_4096) == HAL_OK)
-	//      {
-	//          pressureMbar_ = MS5525_GetPressure_mbar(&ms5525);
-	//          tempDegC_     = (float)MS5525_GetTemperature_mDegC(&ms5525) / 1000.0f;
-	//      }
-	//   }
-	#endif /* SIMULATOR */
+#endif /* SIMULATOR */
 
 	    if (currentTime.seconds != previousTime.seconds)
 	    {

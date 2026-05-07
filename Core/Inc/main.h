@@ -76,7 +76,9 @@ void Error_Handler(void);
 #define MCU_ACTIVE_GPIO_Port GPIOG
 
 /* USER CODE BEGIN Private defines */
-
+#include <stdint.h>
+extern volatile float g_pressure_mbar;
+extern volatile float g_temp_degc;
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

@@ -84,7 +84,7 @@ SDRAM_HandleTypeDef hsdram1;
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .stack_size = 128 * 4,
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for TouchGFXTask */
@@ -140,6 +140,8 @@ void EnableMemoryMappedMode(uint8_t manufacturer_id);
  * =================================================================== */
 
 MS5525_Handle_t ms5525;
+volatile float g_pressure_mbar = 0.0f;
+volatile float g_temp_degc     = 0.0f;
 
 /**
  * @brief  Sensor initialisieren – nach MX_SPI2_Init() aufrufen.
@@ -835,10 +837,17 @@ void EnableMemoryMappedMode(uint8_t manufacturer_id)
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  /* Infinite loop */
+  /* Sensor-Task: liest Druck + Temperatur alle ~40 ms.
+   * MS5525_Read mit OSR_4096 braucht 2x10ms Wandlungszeit (via osDelay),
+   * danach 20ms Pause → Gesamtzyklus ~40ms. */
   for(;;)
   {
-    osDelay(100);
+    if (MS5525_Read(&ms5525, MS5525_OSR_4096) == HAL_OK)
+    {
+      g_pressure_mbar = MS5525_GetPressure_mbar(&ms5525);
+      g_temp_degc     = (float)MS5525_GetTemperature_mDegC(&ms5525) / 1000.0f;
+    }
+    osDelay(20);
   }
   /* USER CODE END 5 */
 }

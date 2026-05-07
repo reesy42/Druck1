@@ -8,6 +8,7 @@
  */
 
 #include "ms5525dso.h"
+#include "cmsis_os.h"
 //#include "../inc/test.h"
 /*------Testpin---------*/
 void TPWrite(){
@@ -76,8 +77,8 @@ static HAL_StatusTypeDef adc_convert(MS5525_Handle_t *dev,
     HAL_StatusTypeDef ret = spi_send_cmd(dev, conv_cmd);
     if (ret != HAL_OK) return ret;
 		TPWrite();
-    /* 2. Auf Wandlungsende warten */
-    HAL_Delay(delay_ms);
+    /* 2. Auf Wandlungsende warten (osDelay gibt CPU an andere Tasks frei) */
+    osDelay(delay_ms);
     TPClear();
     /* 3. ADC auslesen: 1 Byte Kommando + 3 Bytes Daten */
     uint8_t cmd  = MS5525_CMD_ADC_READ;
