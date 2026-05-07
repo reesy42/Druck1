@@ -1,0 +1,35 @@
+#include <gui/screen1_screen/Screen1View.hpp>
+#include <gui/model/Model.hpp>
+Screen1View::Screen1View()
+{
+test=0;
+}
+
+void Screen1View::setupScreen()
+{
+    Screen1ViewBase::setupScreen();
+}
+
+void Screen1View::tearDownScreen()
+{
+    Screen1ViewBase::tearDownScreen();
+}
+void Screen1View::functionUp()
+{
+	//this->test=this->test+1;
+	float p = Model.getPressure_mbar();
+//	char zk[16],z[]="1";
+//	strncpy(zk,touchgfx::TypedText(T_BATHROOM).getText(),16);
+//	strncpy(zk,z,16);
+	Unicode::snprintf(DruckLabelBuffer,DRUCKLABEL_SIZE,"Druck:%2f",p);
+	DruckLabel.invalidate();
+}
+void Screen1View::functionDown()
+{
+	this->test=this->test-1;
+//	char zk[16],z[]="1";
+//	strncpy(zk,touchgfx::TypedText(T_BATHROOM).getText(),16);
+//	strncpy(zk,z,16);
+	Unicode::snprintf(DruckLabelBuffer,DRUCKLABEL_SIZE,"Druck:%d",this->test);
+	DruckLabel.invalidate();
+}	
