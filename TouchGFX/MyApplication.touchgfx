@@ -5,49 +5,6 @@
         "Name": "Screen1",
         "Components": [
           {
-            "Type": "ButtonWithLabel",
-            "Name": "buttonDown",
-            "X": 370,
-            "Y": 222,
-            "Width": 110,
-            "Height": 50,
-            "Pressed": "__generated\\alternate_theme_images_widgets_button_regular_height_50_tiny_round_pressed.png",
-            "Released": "__generated\\alternate_theme_images_widgets_button_regular_height_50_tiny_round_action.png",
-            "TextId": "__SingleUse_YJAU",
-            "ReleasedColor": {
-              "Red": 255,
-              "Green": 255,
-              "Blue": 255
-            },
-            "PressedColor": {
-              "Red": 255,
-              "Green": 255,
-              "Blue": 255
-            },
-            "TextRotation": "0"
-          },
-          {
-            "Type": "ButtonWithLabel",
-            "Name": "buttonUp",
-            "X": 370,
-            "Width": 110,
-            "Height": 50,
-            "Pressed": "__generated\\alternate_theme_images_widgets_button_regular_height_50_tiny_round_pressed.png",
-            "Released": "__generated\\alternate_theme_images_widgets_button_regular_height_50_tiny_round_action.png",
-            "TextId": "__SingleUse_S2XI",
-            "ReleasedColor": {
-              "Red": 255,
-              "Green": 255,
-              "Blue": 255
-            },
-            "PressedColor": {
-              "Red": 255,
-              "Green": 255,
-              "Blue": 255
-            },
-            "TextRotation": "0"
-          },
-          {
             "Type": "TextArea",
             "Name": "DruckLabel",
             "X": 205,
@@ -68,30 +25,7 @@
             }
           }
         ],
-        "Interactions": [
-          {
-            "InteractionName": "Interaction1",
-            "Trigger": {
-              "Type": "TriggerClicked",
-              "TriggerComponent": "buttonUp"
-            },
-            "Action": {
-              "Type": "ActionCustom",
-              "FunctionName": "functionUp"
-            }
-          },
-          {
-            "InteractionName": "Interaction2",
-            "Trigger": {
-              "Type": "TriggerClicked",
-              "TriggerComponent": "buttonDown"
-            },
-            "Action": {
-              "Type": "ActionCustom",
-              "FunctionName": "functionDown"
-            }
-          }
-        ]
+        "Interactions": []
       }
     ],
     "CustomContainerDefinitions": [],

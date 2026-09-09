@@ -15,6 +15,7 @@ public:
         model = m;
     }
     virtual void timeUpdated(Time time) {}
+    virtual void pressureUpdated(float pressure_mmh2o, uint32_t time_ms) {}
 protected:
     Model* model;
 };

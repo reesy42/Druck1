@@ -12,18 +12,12 @@
       <Text Id="__SingleUse_AQEJ" Alignment="Left" TypographyId="TextAuagabe">
         <Translation Language="GB">&lt;value&gt;</Translation>
       </Text>
-      <Text Id="__SingleUse_YJAU" Alignment="Center" TypographyId="Default">
-        <Translation Language="GB">runter</Translation>
-      </Text>
-      <Text Id="__SingleUse_S2XI" Alignment="Center" TypographyId="Default">
-        <Translation Language="GB">hoch</Translation>
-      </Text>
     </TextGroup>
   </Texts>
   <Typographies>
     <Typography Id="Default" Font="verdana.ttf" Size="20" Bpp="4" IsVector="no" Direction="LTR" FallbackCharacter="?" />
     <Typography Id="Large" Font="verdana.ttf" Size="40" Bpp="4" IsVector="no" Direction="LTR" FallbackCharacter="?" />
     <Typography Id="Small" Font="verdana.ttf" Size="10" Bpp="4" IsVector="no" Direction="LTR" FallbackCharacter="?" />
-    <Typography Id="TextAuagabe" Font="verdana.ttf" Size="20" Bpp="4" IsVector="no" Direction="LTR" FallbackCharacter="?" WildcardCharacters=":" WildcardCharacterRanges="0-9,a-z,A-Z" />
+    <Typography Id="TextAuagabe" Font="verdana.ttf" Size="20" Bpp="4" IsVector="no" Direction="LTR" FallbackCharacter="?" WildcardCharacters=":,.,' ',-" WildcardCharacterRanges="0-9,a-z,A-Z" />
   </Typographies>
 </TextDatabase>

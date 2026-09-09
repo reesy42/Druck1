@@ -1,105 +1,98 @@
 #include <gui/model/Model.hpp>
 #include <gui/model/ModelListener.hpp>
 #include <touchgfx/hal/HAL.hpp>
-#include "../../include/gui/model/Model.hpp"
-#include "ms5525dso.h"     // C-Treiber einbinden
-extern "C" MS5525_Handle_t ms5525;   // globale Instanz aus main.c
+#include "main.h"
+#include "pid.h"
 
 #ifdef SIMULATOR
 #include <ctime>
 #ifndef _MSC_VER
 #include <sys/time.h>
-#endif /* _MSC_VER*/
+#endif
 #else
-
 static volatile long lastUs;
 extern uint32_t SystemCoreClock;
 static int freqMHz;
-#endif /* SIMULATOR */
-Model::Model() : modelListener(0)
+#endif
+
+Model::Model() : modelListener(0),
+                 pressureMmh2o_(0.0f), tempDegC_(0.0f), pidOutput_(0.0f),
+                 pidKp_((float)g_pid_kp), pidKi_((float)g_pid_ki),
+                 pidKd_((float)g_pid_kd), pidSetpoint_((float)g_pid_setpoint)
 {
 #ifndef SIMULATOR
-    lastUs = touchgfx::HAL::getInstance()->getCPUCycles();
+    lastUs  = touchgfx::HAL::getInstance()->getCPUCycles();
     freqMHz = SystemCoreClock / 1000000;
 #endif
 }
 
 void Model::tick()
 {
-	   Time previousTime = currentTime;
+    Time previousTime = currentTime;
 
-	#ifdef SIMULATOR
-	#ifdef _MSC_VER
-	    time_t rawtime;
-	    struct tm timenow;
-	    time(&rawtime);
-	    localtime_s(&timenow, &rawtime);
+#ifdef SIMULATOR
+#ifdef _MSC_VER
+    time_t rawtime;
+    struct tm timenow;
+    time(&rawtime);
+    localtime_s(&timenow, &rawtime);
+    currentTime.hours        = timenow.tm_hour;
+    currentTime.minutes      = timenow.tm_min;
+    currentTime.seconds      = timenow.tm_sec;
+    currentTime.milliseconds = 0;
+#else
+    timeval timenow;
+    gettimeofday(&timenow, NULL);
+    currentTime.hours        = (timenow.tv_sec / 60 / 60) % 24;
+    currentTime.minutes      = (timenow.tv_sec / 60) % 60;
+    currentTime.seconds      = timenow.tv_sec % 60;
+    currentTime.milliseconds = timenow.tv_usec / 1000;
+#endif
+#else
+    static int milliseconds = 0;
+    long now = touchgfx::HAL::getInstance()->getCPUCycles();
+    milliseconds += (now - lastUs + freqMHz / 2) / freqMHz / 1000;
+    lastUs = now;
+    currentTime.hours        = (milliseconds / 1000 / 60 / 60) % 24;
+    currentTime.minutes      = (milliseconds / 1000 / 60) % 60;
+    currentTime.seconds      = (milliseconds / 1000) % 60;
+    currentTime.milliseconds = milliseconds % 1000;
 
-	    currentTime.hours =   timenow.tm_hour;
-	    currentTime.minutes = timenow.tm_min;
-	    currentTime.seconds = timenow.tm_sec;
-	    currentTime.milliseconds = 0;
+    pressureMmh2o_ = g_pressure_mmh2o;
+    tempDegC_      = g_temp_degc;
+    pidOutput_     = g_pid_output;
+#endif
 
-	#else
-	    timeval timenow;
-	    gettimeofday(&timenow, NULL);
+    if (currentTime.seconds != previousTime.seconds)
+    {
+        if (modelListener)
+            modelListener->timeUpdated(currentTime);
+    }
 
-	    currentTime.hours = (timenow.tv_sec / 60 / 60) % 24;
-	    currentTime.minutes = (timenow.tv_sec / 60) % 60;
-	    currentTime.seconds = timenow.tv_sec % 60;
-	    currentTime.milliseconds = timenow.tv_usec / 1000;
-	#endif  /*_MSC_VER*/
-	#else
-	    static int milliseconds = 123456;
-		//static uint8_t MessState = 0;
+    /* Druckwert bei jedem tick (~16ms) an View weiterleiten */
+    if (modelListener)
+    {
+        uint32_t ms = (uint32_t)(currentTime.hours   * 3600000u
+                               + currentTime.minutes * 60000u
+                               + currentTime.seconds * 1000u
+                               + currentTime.milliseconds);
+        modelListener->pressureUpdated(pressureMmh2o_, ms);
+    }
+}
 
+void Model::setPidParams(float kp, float ki, float kd, float setpoint)
+{
+    pidKp_       = kp;
+    pidKi_       = ki;
+    pidKd_       = kd;
+    pidSetpoint_ = setpoint;
 
-
-	    //long now = cpu_cycles();
-	    long now = touchgfx::HAL::getInstance()->getCPUCycles();
-	    milliseconds += (now - lastUs + freqMHz / 2) / freqMHz / 1000;
-	    lastUs = now;
-	    currentTime.hours = (milliseconds / 1000 / 60 / 60) % 24;
-	    currentTime.minutes = (milliseconds / 1000 / 60) % 60;
-	    currentTime.seconds = (milliseconds / 1000) % 60;
-	    currentTime.milliseconds = milliseconds % 1000;
-	    /*--------------------------------------------------*/
-
-	    tickCounter_++;
-
-	   // Alle 20 Ticks (~333 ms bei 60 Hz) eine neue Messung starten
-	   if (tickCounter_ % 40 == 0)
-	   {
-	      if (MS5525_Read(&ms5525, MS5525_OSR_4096) == HAL_OK)
-	      {
-	          pressureMbar_ = MS5525_GetPressure_mbar(&ms5525);
-	          tempDegC_     = (float)MS5525_GetTemperature_mDegC(&ms5525) / 1000.0f;
-	      }
-	   }
-
-	//   if (tickCounter_ % 10 == 0)
-	//   {
-	//		 switch(MessState){
-	//			 case 0: break; //Druckmessung starten
-	//			 case 1: break; //Druckmessung aufnehmen, Temperaturmessung starten
-	//			 case 2: break;//Temperaturmessung auswerten,Druck berechnen,in Variablen schreiben
-	//			 default : break;
-	//		 }
-	//		 MessState +=1;if(MessState >= 3)MessState =0;
-	//      if (MS5525_Read(&ms5525, MS5525_OSR_4096) == HAL_OK)
-	//      {
-	//          pressureMbar_ = MS5525_GetPressure_mbar(&ms5525);
-	//          tempDegC_     = (float)MS5525_GetTemperature_mDegC(&ms5525) / 1000.0f;
-	//      }
-	//   }
-	#endif /* SIMULATOR */
-
-	    if (currentTime.seconds != previousTime.seconds)
-	    {
-	        if (modelListener)
-	        {
-	            modelListener->timeUpdated(currentTime);
-	        }
-	    }
-
+#ifndef SIMULATOR
+    g_pid_kp       = kp;
+    g_pid_ki       = ki;
+    g_pid_kd       = kd;
+    g_pid_setpoint = setpoint;
+#else
+    (void)kp; (void)ki; (void)kd; (void)setpoint;
+#endif
 }

@@ -2,6 +2,7 @@
 #define FRONTENDAPPLICATION_HPP
 
 #include <gui_generated/common/FrontendApplicationBase.hpp>
+#include <touchgfx/transitions/NoTransition.hpp>
 
 class FrontendHeap;
 
@@ -11,14 +12,20 @@ class FrontendApplication : public FrontendApplicationBase
 {
 public:
     FrontendApplication(Model& m, FrontendHeap& heap);
-    virtual ~FrontendApplication() { }
+    virtual ~FrontendApplication() {}
 
     virtual void handleTickEvent()
     {
         model.tick();
         FrontendApplicationBase::handleTickEvent();
     }
+
+    /* Navigation zu Screen2 – Implementierung in FrontendApplication.cpp */
+    void gotoScreen2ScreenNoTransition();
+
 private:
+    void gotoScreen2Impl();
+    touchgfx::Callback<FrontendApplication> screen2TransCallback;
 };
 
 #endif // FRONTENDAPPLICATION_HPP

@@ -22,6 +22,7 @@
 
 /* USER CODE BEGIN TouchGFXHAL.cpp */
 
+#include <string.h>
 #include "stm32f7xx.h"
 #include <touchgfx/hal/OSWrappers.hpp>
 #include <CortexMMCUInstrumentation.hpp>
@@ -46,6 +47,14 @@ void TouchGFXHAL::initialize()
     // Please note, HAL::initialize() must be called to initialize the framework.
 
     TouchGFXGeneratedHAL::initialize();
+
+    /* Beide Framebuffer auf Schwarz setzen – verhindert SDRAM-Rauschen beim Start */
+    uint16_t* fb = getTFTFrameBuffer();
+    const uint32_t frameBytes = 480u * 272u * sizeof(uint16_t);
+    memset(fb,                        0x00, frameBytes);
+    memset(fb + 480u * 272u,          0x00, frameBytes);
+    SCB_CleanInvalidateDCache();
+
     setAnimationStorage((void*)animationBuffer);  //enable the animation storage to allow slide animations
     lockDMAToFrontPorch(false);
     instrumentation.init();

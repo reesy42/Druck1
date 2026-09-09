@@ -13,24 +13,22 @@ class Screen1Presenter : public touchgfx::Presenter, public ModelListener
 public:
     Screen1Presenter(Screen1View& v);
 
-    /**
-     * The activate function is called automatically when this screen is "switched in"
-     * (ie. made active). Initialization logic can be placed here.
-     */
     virtual void activate();
-
-    /**
-     * The deactivate function is called automatically when this screen is "switched out"
-     * (ie. made inactive). Teardown functionality can be placed here.
-     */
     virtual void deactivate();
 
+    /* PID-Parameter von der View entgegennehmen und an Model weiterleiten */
+    void setPidParams(float kp, float ki, float kd, float setpoint);
+
+    /* Gespeicherte PID-Parameter aus dem Model lesen */
+    void getPidParams(float& kp, float& ki, float& kd, float& setpoint);
+
+    /* Callback: neuer Druckwert vom Model */
+    virtual void pressureUpdated(float pressure_mmh2o, uint32_t time_ms);
 
     virtual ~Screen1Presenter() {}
 
 private:
     Screen1Presenter();
-
     Screen1View& view;
 };
 

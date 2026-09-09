@@ -79,9 +79,6 @@ typedef struct {
 /* ------------------------------------------------------------------ */
 /*  Öffentliche Funktionen                                             */
 /* ------------------------------------------------------------------ */
-void TPWrite();
-void TPClear();
-void TPInit();
 /**
  * @brief  Initialisierung: Reset, PROM lesen, CRC prüfen.
  * @param  dev   Zeiger auf Handle (hspi muss vorher gesetzt sein)
@@ -106,7 +103,10 @@ int32_t MS5525_GetPressure_Pa(const MS5525_Handle_t *dev);
  * @brief  Druck in mbar zurückgeben (1 Pa = 0,01 mbar → x/100).
  */
 float   MS5525_GetPressure_mbar(const MS5525_Handle_t *dev);
-
+/**
+ * @brief  Druck in mmh2o zurückgeben (1 Pa = 0,102 mmH2O → x/9,80665).
+ */
+float MS5525_GetPressure_mmh2o(const MS5525_Handle_t *dev);
 /**
  * @brief  Temperatur in m°C zurückgeben.
  */

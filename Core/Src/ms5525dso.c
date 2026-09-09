@@ -8,24 +8,7 @@
  */
 
 #include "ms5525dso.h"
-//#include "../inc/test.h"
-/*------Testpin---------*/
-void TPWrite(){
-	HAL_GPIO_WritePin(GPIOI, GPIO_PIN_2, GPIO_PIN_SET);
-}
-void TPClear(){
-	HAL_GPIO_WritePin(GPIOI, GPIO_PIN_2, GPIO_PIN_RESET);
-}
-void TPInit(){
-	GPIO_InitTypeDef GPIO_InitStruct = {0};
-	__HAL_RCC_GPIOI_CLK_ENABLE();
-		GPIO_InitStruct.Pin   = GPIO_PIN_2;
-		GPIO_InitStruct.Mode  = GPIO_MODE_OUTPUT_PP;
-		GPIO_InitStruct.Pull  = GPIO_NOPULL;
-		GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-		HAL_GPIO_Init(GPIOI, &GPIO_InitStruct);
-		HAL_GPIO_WritePin(GPIOI, GPIO_PIN_2, GPIO_PIN_RESET);
-}	
+
 /* ------------------------------------------------------------------ */
 /*  Interne Hilfsfunktionen                                            */
 /* ------------------------------------------------------------------ */
@@ -71,14 +54,13 @@ static HAL_StatusTypeDef adc_convert(MS5525_Handle_t *dev,
                                      uint32_t delay_ms,
                                      uint32_t *result)
 {
-	   TPWrite();
     /* 1. Wandlungskommando senden */
     HAL_StatusTypeDef ret = spi_send_cmd(dev, conv_cmd);
     if (ret != HAL_OK) return ret;
-		TPWrite();
     /* 2. Auf Wandlungsende warten */
+    //TPWrite();
     HAL_Delay(delay_ms);
-    TPClear();
+    //TPClear();
     /* 3. ADC auslesen: 1 Byte Kommando + 3 Bytes Daten */
     uint8_t cmd  = MS5525_CMD_ADC_READ;
     uint8_t buf[3] = {0};
@@ -92,36 +74,65 @@ static HAL_StatusTypeDef adc_convert(MS5525_Handle_t *dev,
     *result = ((uint32_t)buf[0] << 16) | ((uint32_t)buf[1] << 8) | buf[2];
     return ret;
 }
-
-/**
- * @brief  CRC-4 Prüfung des PROM-Inhalts (Datenblatt Abschnitt PROM CRC).
- * @retval true  = CRC korrekt
- */
-static bool crc4_check(uint16_t prom[MS5525_PROM_SIZE])
-{
-    uint16_t n_rem    = 0;
-    uint16_t crc_read = prom[7] & 0x000F;
-
-    prom[7] = prom[7] & 0xFF00;   /* CRC-Nibble löschen */
-
-    for (int cnt = 0; cnt < 16; cnt++)
-    {
-        uint16_t word = (cnt % 2 == 1) ? (prom[cnt >> 1] & 0x00FF)
-                                       : (prom[cnt >> 1] >> 8);
-        n_rem ^= (uint16_t)(word << 8);
-        for (int n_bit = 8; n_bit > 0; n_bit--)
-        {
-            if (n_rem & 0x8000)
-                n_rem = (n_rem << 1) ^ 0x3000;
-            else
-                n_rem <<= 1;
-        }
-    }
-
-    n_rem     = (n_rem >> 12) & 0x000F;
-    prom[7]  |= crc_read;          /* CRC-Nibble wiederherstellen */
-    return (n_rem == crc_read);
+//********************************************************
+//! @brief calculate the CRC code for details look into CRC CODE NOTES
+//!
+//! @return crc code
+//********************************************************
+static bool crc4(uint16_t n_prom[]){
+	int cnt; // simple counter
+	uint16_t n_rem; // crc reminder
+	uint16_t crc_read; // original value of the crc
+	unsigned char n_bit;
+	n_rem = 0x00;
+	crc_read=n_prom[7]; //save read CRC
+	n_prom[7]=(0xFF00 & (n_prom[7])); //CRC byte is replaced by 0
+	for (cnt = 0; cnt < 16; cnt++){ // operation is performed on bytes
+		// choose LSB or MSB
+		if (cnt%2==1) n_rem ^= (unsigned short) ((n_prom[cnt>>1]) & 0x00FF);
+		else n_rem ^= (unsigned short) (n_prom[cnt>>1]>>8);
+		for (n_bit = 8; n_bit > 0; n_bit--){
+			if (n_rem & (0x8000)){
+				n_rem = (n_rem << 1) ^ 0x3000;
+			}
+			else{
+				n_rem = (n_rem << 1);
+			}
+		}
+	}
+	n_rem= (0x000F & (n_rem >> 12)); // // final 4-bit reminder is CRC code
+	n_prom[7]=crc_read; // restore the crc_read to its original place
+	return (n_rem == crc_read);
 }
+//~ /**
+ //~ * @brief  CRC-4 Prüfung des PROM-Inhalts (Datenblatt Abschnitt PROM CRC).
+ //~ * @retval true  = CRC korrekt
+ //~ */
+//~ static bool crc4_check(uint16_t prom[MS5525_PROM_SIZE])
+//~ {
+    //~ uint16_t n_rem    = 0;
+    //~ uint16_t crc_read = prom[7] & 0x000F;
+
+    //~ prom[7] = prom[7] & 0xFF00;   /* CRC-Nibble löschen */
+
+    //~ for (int cnt = 0; cnt < 16; cnt++)
+    //~ {
+        //~ uint16_t word = (cnt % 2 == 1) ? (prom[cnt >> 1] & 0x00FF)
+                                       //~ : (prom[cnt >> 1] >> 8);
+        //~ n_rem ^= (uint16_t)(word << 8);
+        //~ for (int n_bit = 8; n_bit > 0; n_bit--)
+        //~ {
+            //~ if (n_rem & 0x8000)
+                //~ n_rem = (n_rem << 1) ^ 0x3000;
+            //~ else
+                //~ n_rem <<= 1;
+        //~ }
+    //~ }
+
+    //~ n_rem     = (n_rem >> 12) & 0x000F;
+    //~ prom[7]  |= crc_read;          /* CRC-Nibble wiederherstellen */
+    //~ return (n_rem == crc_read);
+//~ }
 
 /**
  * @brief  OSR → Konvertierungskommando-Offset (0,2,4,6,8).
@@ -151,18 +162,21 @@ HAL_StatusTypeDef MS5525_Init(MS5525_Handle_t *dev)
 
     /* Reset senden und 10 ms warten (Datenblatt: min. 8,2 ms) */
     HAL_StatusTypeDef ret = spi_send_cmd(dev, MS5525_CMD_RESET);
-    if (ret != HAL_OK) return ret;
+    if (ret != HAL_OK){
+    	return ret;
+    }
     HAL_Delay(10);
 
     /* PROM lesen (8 × 16 Bit, Adressen 0..7) */
-    for (uint8_t i = 0; i < MS5525_PROM_SIZE; i++)
-    {
+    for (uint8_t i = 0; i < MS5525_PROM_SIZE; i++){
         ret = prom_read(dev, i, &dev->prom[i]);
-        if (ret != HAL_OK) return ret;
+        if (ret != HAL_OK){
+        	return ret;
+        }
     }
 
     /* CRC prüfen */
-    if (!crc4_check(dev->prom))
+    if (!crc4(dev->prom))
         return HAL_ERROR;
 
     dev->initialized = true;
@@ -179,9 +193,9 @@ HAL_StatusTypeDef MS5525_Read(MS5525_Handle_t *dev, MS5525_OSR_t osr)
 		#define Q5 7
 		#define Q6 21
 	
-    if (!dev->initialized)
+    if (!dev->initialized){
         return HAL_ERROR;
-
+    }
     uint8_t  off = osr_offset(osr);
     uint32_t dly = osr_delay_ms(osr);
     uint32_t D1  = 0;   /* Roh-Druckwert    */
@@ -189,12 +203,14 @@ HAL_StatusTypeDef MS5525_Read(MS5525_Handle_t *dev, MS5525_OSR_t osr)
 
     /* Druckwandlung */
     HAL_StatusTypeDef ret = adc_convert(dev,MS5525_CMD_CONV_D1_256 + off, dly, &D1);
-    if (ret != HAL_OK) return ret;
-
+    if (ret != HAL_OK){
+    	return ret;
+    }
     /* Temperaturwandlung */
     ret = adc_convert(dev, MS5525_CMD_CONV_D2_256 + off, dly, &D2);
-    if (ret != HAL_OK) return ret;
-
+    if (ret != HAL_OK){
+    	return ret;
+    }
     /* ---------------------------------------------------------------- *
      * Kompensation laut Datenblatt                                      *
      * Koeffizienten:                                                     *
@@ -263,6 +279,12 @@ float MS5525_GetPressure_mbar(const MS5525_Handle_t *dev)
 {
 	  float f=0;
 	  f= (float)dev->pressure_Pa / 100.0f;
+    return f;
+}
+float MS5525_GetPressure_mmh2o(const MS5525_Handle_t *dev)
+{
+	  float f=0;
+	  f= (float)dev->pressure_Pa / 9.80665f;
     return f;
 }
 

@@ -15,22 +15,32 @@ public:
     }
 
     void tick();
-	float getPressure_mbar()   const { return pressureMbar_; }
+
+    /* PID-Parameter an Hardware weitergeben und persistent speichern */
+    void setPidParams(float kp, float ki, float kd, float setpoint);
+
+    float getPressureMmh2o()    const { return pressureMmh2o_; }
     float getTemperature_degC() const { return tempDegC_; }
-    Time getCurrentTime() const
-    {
-        return currentTime;
-    }
+    float getPidOutput()        const { return pidOutput_; }
+    Time  getCurrentTime()      const { return currentTime; }
+
+    float getPidKp()        const { return pidKp_; }
+    float getPidKi()        const { return pidKi_; }
+    float getPidKd()        const { return pidKd_; }
+    float getPidSetpoint()  const { return pidSetpoint_; }
 
 protected:
     ModelListener* modelListener;
-    //bool mcuLoadActive;
     Time currentTime;
-    //uint8_t selectedMenuIndex;
+
 private:
-    float pressureMbar_ ;
-    float tempDegC_     ;
-    uint32_t tickCounter_;
+    float pressureMmh2o_;
+    float tempDegC_;
+    float pidOutput_;
+    float pidKp_;
+    float pidKi_;
+    float pidKd_;
+    float pidSetpoint_;
 };
 
 #endif // MODEL_HPP

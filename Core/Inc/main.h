@@ -54,7 +54,7 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-
+/* Lueftersteuerung: siehe dshot.h (DShot600 auf PA15 / TIM2_CH1) */
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
@@ -76,8 +76,27 @@ void Error_Handler(void);
 #define MCU_ACTIVE_GPIO_Port GPIOG
 
 /* USER CODE BEGIN Private defines */
+extern volatile float g_pressure_mbar;
+extern volatile float g_pressure_mmh2o;
+extern volatile float g_temp_degc;
 
+/* PID-Regler Parameter (werden von der UI gesetzt) */
+extern volatile float g_pid_kp;
+extern volatile float g_pid_ki;
+extern volatile float g_pid_kd;
+extern volatile float g_pid_setpoint;   /* Sollwert in mmH2O */
+extern volatile float g_pid_output;     /* Reglerausgang 0-100 % */
+extern volatile float g_pid_dt;         /* Abtastzeit in Sekunden */
+extern volatile uint8_t g_pid_enabled;
 /* USER CODE END Private defines */
+
+/*------Testpin (Oszilloskop-Trigger, PI2)---------*/
+void TPWrite(void);
+void TPClear(void);
+void TPToggle(void);
+void TPInit(void);
+
+
 
 #ifdef __cplusplus
 }

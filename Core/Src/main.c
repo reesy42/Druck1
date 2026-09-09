@@ -22,10 +22,13 @@
 #include "cmsis_os.h"
 #include "libjpeg.h"
 #include "app_touchgfx.h"
-#include "ms5525dso.h"
+#include "abp2d.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "pid.h"
+#include "flash_params.h"
+#include "dshot.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -84,7 +87,7 @@ SDRAM_HandleTypeDef hsdram1;
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .stack_size = 128 * 4,
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for TouchGFXTask */
@@ -122,7 +125,11 @@ extern void videoTaskFunc(void *argument);
 
 /* USER CODE BEGIN PFP */
 void GetManufacturerId (uint8_t *manufacturer_id);
-void EnableMemoryMappedMode(uint8_t manufacturer_id);  
+void EnableMemoryMappedMode(uint8_t manufacturer_id);
+void TPInit(void);
+void TPWrite(void);
+void TPClear(void);
+void TPToggle(void);
 
 /* USER CODE END PFP */
 
@@ -139,19 +146,35 @@ void EnableMemoryMappedMode(uint8_t manufacturer_id);
  * ABSCHNITT B: Sensor-Instanz (global, z.B. in main.c)
  * =================================================================== */
 
-MS5525_Handle_t ms5525;
+ABP2D_Handle_t abp2d;
+volatile float g_pressure_mbar  = 0.0f;
+volatile float g_pressure_mmh2o = 0.0f;
+volatile float g_temp_degc      = 0.0f;
+
+/* PID-Regler globale Variablen */
+volatile float   g_pid_kp       = 0.5f;
+volatile float   g_pid_ki       = 1.5f;
+volatile float   g_pid_kd       = 0.05f;
+volatile float   g_pid_setpoint = 50.0f;
+volatile float   g_pid_output   = 0.0f;
+volatile float   g_pid_dt       = 0.020f;  /* 20 ms Abtastzeit (fest) */
+volatile uint8_t g_pid_enabled  = 1;
+
+static PID_Handle_t pid;
 
 /**
  * @brief  Sensor initialisieren – nach MX_SPI2_Init() aufrufen.
  */
 void Sensor_Init(void)
 {
-    ms5525.hspi = &hspi2;
+	static int i=0;
+    abp2d.hspi = &hspi2;
 
-    if (MS5525_Init(&ms5525) != HAL_OK)
+    if (ABP2D_Init(&abp2d) != HAL_OK)
     {
         /* Fehlerbehandlung: z.B. LED blinken oder Fehlercode anzeigen */
-        Error_Handler();
+        //Error_Handler();
+    	i+=1;
     }
 }
 int main(void)
@@ -162,7 +185,8 @@ int main(void)
   /* USER CODE END 1 */
 
   /* MPU Configuration--------------------------------------------------------*/
-  MPU_Config();
+
+	MPU_Config();
 
   /* Enable the CPU Cache */
 
@@ -199,13 +223,30 @@ int main(void)
   MX_LIBJPEG_Init();
   MX_SPI2_Init();
   TPInit();
+  HAL_Delay(500);//Warte bis sensor ready
   Sensor_Init();
-
+  DShot_Init();
+  /* PID-Parameter aus Flash laden (Fallback: Defaults) */
+  FlashParams_Load((float*)&g_pid_kp, (float*)&g_pid_ki,
+                   (float*)&g_pid_kd, (float*)&g_pid_setpoint);
+  /* PID initialisieren: dt = 10ms Abtastzeit */
+  PID_Init(&pid, (float)g_pid_kp, (float)g_pid_ki, (float)g_pid_kd,
+           (float)g_pid_setpoint, 0.010f);
+  /* DShot-Wiederholung schon hier starten, nicht erst im RTOS-Task: haelt die
+   * Leitung ab jetzt durchgehend mit gueltigen Nullgas-Frames belegt, auch
+   * waehrend TouchGFX/PreOSInit booten. Frueher getestet: Arm/Repeat erst
+   * NACH TouchGFX-Init zu starten machte es schlimmer, weil die Leitung
+   * waehrend des TouchGFX-Boots komplett still lag - das schickt die ESC
+   * noch zuverlaessiger in einen Reset-Loop.
+   * Nur die Wartezeit, bevor der PID-Task echten Schub freigibt, wandert
+   * unten in den RTOS-Task (osDelay statt HAL_Delay, blockiert TouchGFX
+   * dadurch nicht mehr). */
+  DShot_SetRaw(0U);
+  DShot_StartRepeat(1000U);
   MX_TouchGFX_Init();
   /* Call PreOsInit function */
   MX_TouchGFX_PreOSInit();
   /* USER CODE BEGIN 2 */
-
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -552,7 +593,7 @@ static void MX_SPI2_Init(void)
   hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi2.Init.NSS = SPI_NSS_SOFT;
-  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
   hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -760,7 +801,36 @@ static void MX_GPIO_Init(void)
   /* USER CODE END MX_GPIO_Init_2 */
 }
 
+/**
+  * @brief Lueftersteuerung: DShot600 auf PA15 / TIM2_CH1, siehe dshot.c
+  */
+
 /* USER CODE BEGIN 4 */
+
+/*------Testpin (Oszilloskop-Trigger, PI2)---------*/
+void TPWrite(void)
+{
+  HAL_GPIO_WritePin(GPIOI, GPIO_PIN_2, GPIO_PIN_SET);
+}
+void TPClear(void)
+{
+  HAL_GPIO_WritePin(GPIOI, GPIO_PIN_2, GPIO_PIN_RESET);
+}
+void TPToggle(void)
+{
+  HAL_GPIO_TogglePin(GPIOI, GPIO_PIN_2);
+}
+void TPInit(void)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+  __HAL_RCC_GPIOI_CLK_ENABLE();
+  GPIO_InitStruct.Pin   = GPIO_PIN_2;
+  GPIO_InitStruct.Mode  = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull  = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(GPIOI, &GPIO_InitStruct);
+  HAL_GPIO_WritePin(GPIOI, GPIO_PIN_2, GPIO_PIN_RESET);
+}
 
 // Read manufacturer ID of external QSPI flash
 void GetManufacturerId (uint8_t *manufacturer_id)
@@ -835,10 +905,39 @@ void EnableMemoryMappedMode(uint8_t manufacturer_id)
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  /* Infinite loop */
+  /* ESC-Armzeit abwarten (DShot_StartRepeat() sendet seit main() schon
+   * durchgehend Nullgas-Frames, siehe dortiger Kommentar). osDelay() statt
+   * HAL_Delay(), damit TouchGFX/andere Tasks waehrend dieser Wartezeit
+   * weiterlaufen koennen - danach uebernimmt die Schleife unten den
+   * Sollwert ueber DShot_SetPercent(). */
+  osDelay(2000U);
+
+  /* Sensor-Task: liest Druck alle ~10 ms, fuehrt PID-Berechnung durch.
+   * ABP2D_Read braucht ~6 ms Wandlungszeit (ABP2D_CONV_DELAY_MS). */
   for(;;)
   {
-    osDelay(100);
+    if (ABP2D_Read(&abp2d) == HAL_OK)
+    {
+      g_pressure_mmh2o = ABP2D_GetPressure_mmh2o(&abp2d);
+      g_temp_degc      = (float)ABP2D_GetTemperature_mDegC(&abp2d) / 1000.0f;
+    }
+
+    if (g_pid_enabled)
+    {
+      pid.dt = 0.010f;
+      PID_SetParams(&pid,
+                    (float)g_pid_kp,
+                    (float)g_pid_ki,
+                    (float)g_pid_kd,
+                    (float)g_pid_setpoint);
+      g_pid_enabled = 0;
+    }
+    float out = PID_Compute(&pid, (float)g_pressure_mmh2o);
+    g_pid_output = out;
+    DShot_SetPercent((uint8_t)out);   /* TIM5-ISR sendet mit 1 kHz */
+
+    osDelay(4);  /* ~6 ms fuer Sensor-Read, gesamt ~10 ms */
+    //TPToggle();
   }
   /* USER CODE END 5 */
 }
