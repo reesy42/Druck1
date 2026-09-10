@@ -233,16 +233,27 @@ int main(void)
   PID_Init(&pid, (float)g_pid_kp, (float)g_pid_ki, (float)g_pid_kd,
            (float)g_pid_setpoint, 0.010f);
   /* DShot-Wiederholung schon hier starten, nicht erst im RTOS-Task: haelt die
-   * Leitung ab jetzt durchgehend mit gueltigen Nullgas-Frames belegt, auch
-   * waehrend TouchGFX/PreOSInit booten. Frueher getestet: Arm/Repeat erst
-   * NACH TouchGFX-Init zu starten machte es schlimmer, weil die Leitung
-   * waehrend des TouchGFX-Boots komplett still lag - das schickt die ESC
-   * noch zuverlaessiger in einen Reset-Loop.
-   * Nur die Wartezeit, bevor der PID-Task echten Schub freigibt, wandert
-   * unten in den RTOS-Task (osDelay statt HAL_Delay, blockiert TouchGFX
-   * dadurch nicht mehr). */
+   * Leitung ab jetzt durchgehend mit gueltigen Nullgas-Frames belegt. Frueher
+   * getestet: Arm/Repeat erst NACH TouchGFX-Init zu starten machte es
+   * schlimmer, weil die Leitung waehrend des TouchGFX-Boots komplett still
+   * lag - das schickt die ESC noch zuverlaessiger in einen Reset-Loop. */
   DShot_SetRaw(0U);
   DShot_StartRepeat(1000U);
+  /* Arm-Wartezeit bewusst HIER bare-metal (blockierend), VOR
+   * MX_TouchGFX_Init()/PreOSInit() und VOR osKernelStart() - nicht erst als
+   * osDelay() im RTOS-Task. Grund (gefunden/verifiziert 2026-09-10): Laeuft
+   * die Arm-Wartezeit stattdessen NACH RTOS-Start parallel zu TouchGFX-Init
+   * (LTDC/DMA2D/QuadSPI/JPEG-Bus-Last) bzw. mit aktivem Scheduler, geht bei
+   * einzelnen DShot-Frames zuverlaessig genau 1 Datenbit verloren -> ESC
+   * armt nicht zuverlaessig. Mit der Wartezeit hier (RTOS/TouchGFX komplett
+   * inaktiv waehrend der 2s) 10 von 10 Arm-Versuchen erfolgreich, keine
+   * verkuerzten Frames mehr. Bewusst in Kauf genommener Trade-off: TouchGFX-
+   * Init und damit das erste Displaybild verzoegern sich dadurch um die
+   * vollen 2s (vorher liefen Armen und TouchGFX-Boot parallel) - fuer
+   * zuverlaessiges Armen als wichtiger bewertet als schnellerer Boot. Die
+   * urspruengliche osDelay(2000) in StartDefaultTask ist dafuer auf eine
+   * kurze Sicherheitsmarge reduziert - siehe dort. */
+  HAL_Delay(2000U);
   MX_TouchGFX_Init();
   /* Call PreOsInit function */
   MX_TouchGFX_PreOSInit();
@@ -905,12 +916,11 @@ void EnableMemoryMappedMode(uint8_t manufacturer_id)
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  /* ESC-Armzeit abwarten (DShot_StartRepeat() sendet seit main() schon
-   * durchgehend Nullgas-Frames, siehe dortiger Kommentar). osDelay() statt
-   * HAL_Delay(), damit TouchGFX/andere Tasks waehrend dieser Wartezeit
-   * weiterlaufen koennen - danach uebernimmt die Schleife unten den
-   * Sollwert ueber DShot_SetPercent(). */
-  osDelay(2000U);
+  /* ESC-Armzeit wird jetzt VOR osKernelStart() in main() bare-metal
+   * abgewartet (siehe dortiger Kommentar) - hier nur noch eine kurze
+   * Sicherheitsmarge fuer den Scheduler-Anlauf selbst, bevor die Schleife
+   * unten den Sollwert ueber DShot_SetPercent() uebernimmt. */
+  osDelay(50U);
 
   /* Sensor-Task: liest Druck alle ~10 ms, fuehrt PID-Berechnung durch.
    * ABP2D_Read braucht ~6 ms Wandlungszeit (ABP2D_CONV_DELAY_MS). */

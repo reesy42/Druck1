@@ -53,12 +53,15 @@ static void DShot_DmaInit(void)
   hdma_tim2_ch1.Init.MemDataAlignment    = DMA_MDATAALIGN_WORD;
   hdma_tim2_ch1.Init.Mode                = DMA_NORMAL;
   hdma_tim2_ch1.Init.Priority            = DMA_PRIORITY_VERY_HIGH;
-  /* FIFO statt Direct Mode: puffert bis zu 4 Worte voraus, damit ein kurzer
-   * Bus-Stall (z.B. durch LTDC/DMA2D-Displayzugriff bei TouchGFX) keinen
-   * Compare-Event verpasst - im Direct Mode muss jeder Transfer synchron
-   * vor dem naechsten Bit fertig sein, ohne jede Reserve. */
+  /* FIFO aktiv, aber Schwelle HALFFULL (2 Worte) statt FULL (4): DSHOT_BUF_LEN=18
+   * ist durch 2, aber nicht durch 4 teilbar - mit FULL entstand dadurch ein
+   * FIFO-Underrun (FEIF) am Blockende, der zu abgeschnittenen/zu kurzen Frames
+   * fuehrte (siehe project-odem-luefter-esc Memory, 2026-09-09/10). Test mit
+   * FIFOMode=DISABLE (Direct Mode) hat das Problem NICHT behoben - FIFO-
+   * Underrun ist also vermutlich nicht die (alleinige) Ursache, wird hier
+   * trotzdem als naechster dokumentierter Versuch umgesetzt. */
   hdma_tim2_ch1.Init.FIFOMode            = DMA_FIFOMODE_ENABLE;
-  hdma_tim2_ch1.Init.FIFOThreshold       = DMA_FIFO_THRESHOLD_FULL;
+  hdma_tim2_ch1.Init.FIFOThreshold       = DMA_FIFO_THRESHOLD_HALFFULL;
   hdma_tim2_ch1.Init.MemBurst            = DMA_MBURST_SINGLE;
   hdma_tim2_ch1.Init.PeriphBurst         = DMA_PBURST_SINGLE;
 
@@ -165,8 +168,23 @@ void DShot_SendRaw(uint16_t value)
   /* D-Cache ist aktiv: Puffer vor dem DMA-Zugriff aus dem Cache zurueckschreiben. */
   SCB_CleanDCache_by_Addr((uint32_t *)dshotBuf, (int32_t)sizeof(dshotBuf));
 
-  __HAL_TIM_SET_COUNTER(&htim2, 0U);
+  /* Reihenfolge kritisch (Ursache fuer "zu kurze/verschobene Frames",
+   * FIFO-unabhaengig - siehe project-odem-luefter-esc Memory, 2026-09-10):
+   * TIM2 laeuft seit DShot_Init() durchgehend frei. Der erste DMA-Fetch
+   * wird ueber einen Compare-Match bei CNT==CCR1 ausgeloest, wobei CCR1
+   * vom letzten Frame noch auf 0 steht (die zwei Nullworte am Ende) - ein
+   * Counter-Reset auf 0 erzeugt also sofort diesen Match. Stand bisher
+   * SET_COUNTER VOR Start_DMA: zwischen den beiden Zeilen liegen mehrere
+   * TIM2-Register-Schreibzugriffe in HAL_TIM_PWM_Start_DMA - verzoegert
+   * sich das um mehr als eine Bitperiode (1,667 us, z.B. durch einen
+   * Bus-Stall von TouchGFX/LTDC/DMA2D), ist der DMA-Request beim
+   * Scharfschalten noch nicht aktiv und der erste Match wird verpasst ->
+   * Frame startet (mind.) eine Periode zu spaet. Fix: DMA/Request zuerst
+   * scharf schalten, Counter-Reset als letzter Schritt direkt davor -
+   * dann bleibt keine Luecke mehr fuer einen Stall zwischen "Request aktiv"
+   * und "Match-Bedingung erzeugen". */
   (void)HAL_TIM_PWM_Start_DMA(&htim2, TIM_CHANNEL_1, dshotBuf, DSHOT_BUF_LEN);
+  __HAL_TIM_SET_COUNTER(&htim2, 0U);
 }
 
 void DShot_SendPercent(uint8_t percent)
