@@ -5,19 +5,23 @@
 /* Screen2-Typen fuer TypeList-Groessenberechnung */
 #include <gui/screen2_screen/Screen2View.hpp>
 #include <gui/screen2_screen/Screen2Presenter.hpp>
+#include <gui/screen3_screen/Screen3View.hpp>
+#include <gui/screen3_screen/Screen3Presenter.hpp>
 
 class FrontendHeap : public FrontendHeapBase
 {
 public:
     /* Alle user-definierten View-Typen */
     typedef touchgfx::meta::TypeList< Screen2View,
+            touchgfx::meta::TypeList< Screen3View,
                             touchgfx::meta::Nil
-                            > UserDefinedViewTypes;
+                            > > UserDefinedViewTypes;
 
     /* Alle user-definierten Presenter-Typen */
     typedef touchgfx::meta::TypeList< Screen2Presenter,
+            touchgfx::meta::TypeList< Screen3Presenter,
                             touchgfx::meta::Nil
-                            > UserDefinedPresenterTypes;
+                            > > UserDefinedPresenterTypes;
 
     /* Transitions (keine zusaetzlichen) */
     typedef touchgfx::meta::TypeList< touchgfx::meta::Nil,

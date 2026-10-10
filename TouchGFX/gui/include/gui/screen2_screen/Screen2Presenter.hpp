@@ -15,6 +15,7 @@ public:
     virtual void activate();
     virtual void deactivate();
     virtual void pressureUpdated(float pressure_mmh2o, uint32_t time_ms);
+    virtual void pwmUpdated(float pwm_percent);
     virtual ~Screen2Presenter() {}
 
 private:

@@ -17,6 +17,8 @@ static const uint16_t COL_BTN      = touchgfx::Color::getColorFromRGB( 45,  50, 
 static const uint16_t COL_BTN_ACT  = touchgfx::Color::getColorFromRGB( 70, 130, 200);
 static const uint16_t COL_IST      = touchgfx::Color::getColorFromRGB(  0, 220, 120);
 static const uint16_t COL_SOLL     = touchgfx::Color::getColorFromRGB(220, 160,  30);
+static const uint16_t COL_RUN      = touchgfx::Color::getColorFromRGB( 20, 140,  60);
+static const uint16_t COL_STOPPED  = touchgfx::Color::getColorFromRGB(150,  30,  30);
 
 /* -----------------------------------------------------------------------
  * writeStr: ASCII-String zeichenweise als UnicodeChar schreiben
@@ -67,7 +69,7 @@ uint16_t Screen1View::buildFixed(touchgfx::Unicode::UnicodeChar* buf, uint16_t s
  * Konstruktor
  * --------------------------------------------------------------------- */
 Screen1View::Screen1View()
-    : activeParam(-1), inputLen(0), infoTicks(0)
+    : activeParam(-1), inputLen(0), fanRunning(true), infoTicks(0)
 {
     paramValues[PARAM_KP]    = 2.0f;
     paramValues[PARAM_KI]    = 0.5f;
@@ -108,8 +110,9 @@ void Screen1View::setupScreen()
     buildParamPanel();
     buildNumpad();
     buildIstSollLines();
-    buildGraphButton();
+    buildNextButton();
     buildSaveButton();
+    buildStartStopButton();
 
     presenter->setPidParams(paramValues[PARAM_KP], paramValues[PARAM_KI],
                             paramValues[PARAM_KD], paramValues[PARAM_PSOLL]);
@@ -345,8 +348,11 @@ void Screen1View::applyInput()
     if (saved == PARAM_PSOLL)
         updateSollLine();
 
+    /* Bei gestopptem Luefter bleibt die Drehzahl auf 0, der editierte Sollwert
+       wird nur gemerkt und erst beim naechsten Start uebernommen. */
     presenter->setPidParams(paramValues[PARAM_KP], paramValues[PARAM_KI],
-                            paramValues[PARAM_KD], paramValues[PARAM_PSOLL]);
+                            paramValues[PARAM_KD],
+                            fanRunning ? paramValues[PARAM_PSOLL] : 0.0f);
 }
 
 /* -----------------------------------------------------------------------
@@ -384,15 +390,29 @@ void Screen1View::handleClickEvent(const touchgfx::ClickEvent& evt)
         }
     }
 
-    /* Graph-Button */
+    /* ">"-Button -> Screen2 */
+    if (nextBtn.contains(x, y))
     {
-        touchgfx::Rect r = graphBtn.getRect();
+        nextBtn.setBackgroundColor(COL_BTN_ACT);
+        application().gotoScreen2ScreenNoTransition();
+        return;
+    }
+
+    /* Start/Stop-Button */
+    {
+        touchgfx::Rect r = startStopBtn.getRect();
         if (x >= r.x && x < r.x + r.width &&
             y >= r.y && y < r.y + r.height)
         {
-            graphBtn.setColor(touchgfx::Color::getColorFromRGB(70, 130, 200));
-            graphBtn.invalidate();
-            application().gotoScreen2ScreenNoTransition();
+            fanRunning = !fanRunning;
+
+            presenter->setPidParams(paramValues[PARAM_KP], paramValues[PARAM_KI],
+                                    paramValues[PARAM_KD],
+                                    fanRunning ? paramValues[PARAM_PSOLL] : 0.0f);
+            g_pid_enabled = 1;   // neuer Sollwert (0 oder Soll) wird vom PID-Task uebernommen
+
+            updateStartStopButton();
+            showInfo(fanRunning ? "Gestartet" : "Gestoppt");
             return;
         }
     }
@@ -415,26 +435,57 @@ void Screen1View::handleClickEvent(const touchgfx::ClickEvent& evt)
 }
 
 /* -----------------------------------------------------------------------
- * buildGraphButton  (rechtes Panel, ganz unten)
+ * buildNextButton  ">" -> Screen2 (rechtes Panel, ganz unten)
  * --------------------------------------------------------------------- */
-void Screen1View::buildGraphButton()
+void Screen1View::buildNextButton()
 {
-    /* Rechts neben dem Speichern-Button (der bei x=235, w=100, also endet bei x=335) */
+    /* Rechts neben dem Speichern-Button (der bei x=230, w=105, also endet bei x=335) */
     const int16_t bx = 340;
     const int16_t by = 206;
     const int16_t bw = SCREEN_W - bx - 5;
     const int16_t bh = 46;
 
-    graphBtn.setPosition(bx, by, bw, bh);
-    graphBtn.setColor(touchgfx::Color::getColorFromRGB(40, 80, 140));
-    add(graphBtn);
+    nextBtn.setPosition(bx, by, bw, bh);
+    nextBtn.setDirection(NavArrow::RIGHT);
+    nextBtn.setBackgroundColor(touchgfx::Color::getColorFromRGB(40, 80, 140));
+    add(nextBtn);
+}
 
-    graphBtnLabel.setPosition(bx + 2, by + (bh - 20) / 2, bw - 4, 20);
-    graphBtnLabel.setColor(touchgfx::Color::getColorFromRGB(200, 220, 255));
-    graphBtnLabel.setWildcard(graphBtnBuf);
-    graphBtnLabel.setTypedText(dummyTypedText());
-    writeStr(graphBtnBuf, 16, "Diagramm");
-    add(graphBtnLabel);
+/* -----------------------------------------------------------------------
+ * buildStartStopButton  (linkes Panel, Luecke unter der Parameterliste)
+ * --------------------------------------------------------------------- */
+void Screen1View::buildStartStopButton()
+{
+    const int16_t bx = 15;
+    const int16_t by = 134;
+    const int16_t bw = PANEL_W - 30;
+    const int16_t bh = 44;
+
+    startStopBtn.setPosition(bx, by, bw, bh);
+    add(startStopBtn);
+
+    /* Label etwas hoeher als die Zeilenhoehe des Fonts, damit Unterlaengen
+       (z.B. das "p" in "Stop") nicht am unteren Rand abgeschnitten werden. */
+    const int16_t labelH = 26;
+    startStopBtnLabel.setPosition(bx + 2, by + (bh - labelH) / 2, bw - 4, labelH);
+    startStopBtnLabel.setWildcard(startStopBtnBuf);
+    startStopBtnLabel.setTypedText(dummyTypedText());
+    add(startStopBtnLabel);
+
+    updateStartStopButton();
+}
+
+/* -----------------------------------------------------------------------
+ * updateStartStopButton  — Farbe/Text passend zu fanRunning aktualisieren
+ * --------------------------------------------------------------------- */
+void Screen1View::updateStartStopButton()
+{
+    startStopBtn.setColor(fanRunning ? COL_RUN : COL_STOPPED);
+    startStopBtn.invalidate();
+
+    startStopBtnLabel.setColor(touchgfx::Color::getColorFromRGB(240, 240, 240));
+    writeStr(startStopBtnBuf, 8, fanRunning ? "Stop" : "Start");
+    startStopBtnLabel.invalidate();
 }
 
 /* -----------------------------------------------------------------------

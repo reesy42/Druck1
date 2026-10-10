@@ -29,6 +29,11 @@ public:
     float getPidKd()        const { return pidKd_; }
     float getPidSetpoint()  const { return pidSetpoint_; }
 
+    /* Druck-Extremwerte seit Start bzw. letztem Reset (laufen screen-unabhaengig mit) */
+    float getPressureMax() const { return pressureMax_; }
+    float getPressureMin() const { return pressureMin_; }
+    void  resetPressureMinMax()  { pressureMinMaxValid_ = false; }
+
 protected:
     ModelListener* modelListener;
     Time currentTime;
@@ -41,6 +46,9 @@ private:
     float pidKi_;
     float pidKd_;
     float pidSetpoint_;
+    float pressureMax_;
+    float pressureMin_;
+    bool  pressureMinMaxValid_;   /* false -> beim naechsten tick() mit aktuellem Druck neu starten */
 };
 
 #endif // MODEL_HPP

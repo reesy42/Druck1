@@ -8,5 +8,11 @@ void Screen2Presenter::deactivate() {}
 
 void Screen2Presenter::pressureUpdated(float pressure_mmh2o, uint32_t time_ms)
 {
+    view.onSetpointUpdated(model->getPidSetpoint());
     view.onPressureUpdated(pressure_mmh2o, time_ms);
+}
+
+void Screen2Presenter::pwmUpdated(float pwm_percent)
+{
+    view.onPwmUpdated(pwm_percent);
 }

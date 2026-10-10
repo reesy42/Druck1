@@ -29,6 +29,7 @@
 #include "pid.h"
 #include "flash_params.h"
 #include "dshot.h"
+#include "scope_out.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -226,6 +227,7 @@ int main(void)
   HAL_Delay(500);//Warte bis sensor ready
   Sensor_Init();
   DShot_Init();
+  ScopeOut_Init();   /* Oszi-Monitor: D3 = Druck, D6 = Stellwert (scope_out.h) */
   /* PID-Parameter aus Flash laden (Fallback: Defaults) */
   FlashParams_Load((float*)&g_pid_kp, (float*)&g_pid_ki,
                    (float*)&g_pid_kd, (float*)&g_pid_setpoint);
@@ -945,6 +947,8 @@ void StartDefaultTask(void *argument)
     float out = PID_Compute(&pid, (float)g_pressure_mmh2o);
     g_pid_output = out;
     DShot_SetPercent((uint8_t)out);   /* TIM5-ISR sendet mit 1 kHz */
+    ScopeOut_SetPressure((float)g_pressure_mmh2o);
+    ScopeOut_SetOutput(out);
 
     osDelay(4);  /* ~6 ms fuer Sensor-Read, gesamt ~10 ms */
     //TPToggle();

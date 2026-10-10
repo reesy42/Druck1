@@ -4,6 +4,7 @@
 #include <gui_generated/screen2_screen/Screen2ViewBase.hpp>
 #include <gui/screen2_screen/Screen2Presenter.hpp>
 #include <gui/common/PressureGraph.hpp>
+#include <gui/common/NavArrow.hpp>
 #include <touchgfx/widgets/Box.hpp>
 #include <touchgfx/widgets/TextAreaWithWildcard.hpp>
 
@@ -11,7 +12,7 @@
  * Screen2 – Druckverlauf-Diagramm
  *
  * Layout (480 x 272):
- *   y=  0..29  : Header (Titel + Zurück-Button)
+ *   y=  0..29  : Header ("<"-Button, Legende, ">"-Button)
  *   y= 30..247 : PressureGraph (480 x 218)
  *   y=248..271 : Statuszeile (Ist/Soll)
  */
@@ -24,6 +25,8 @@ public:
     virtual void tearDownScreen();
 
     void onPressureUpdated(float pressure_mmh2o, uint32_t time_ms);
+    void onPwmUpdated(float pwm_percent) { lastPwm_ = pwm_percent; }
+    void onSetpointUpdated(float setpoint_mmh2o);
 
     virtual void handleClickEvent(const touchgfx::ClickEvent& evt);
 
@@ -39,11 +42,12 @@ private:
     touchgfx::Box                     hdrBg;
     touchgfx::TextAreaWithOneWildcard titleText;
     touchgfx::Unicode::UnicodeChar    titleBuf[24];
+    touchgfx::TextAreaWithOneWildcard pwmLegendText;
+    touchgfx::Unicode::UnicodeChar    pwmLegendBuf[10];
 
-    /* Zurück-Button */
-    touchgfx::Box                     backBtn;
-    touchgfx::TextAreaWithOneWildcard backLabel;
-    touchgfx::Unicode::UnicodeChar    backLabelBuf[10];
+    /* Navigation: "<" -> Screen1, ">" -> Screen3 */
+    NavArrow                          prevBtn;
+    NavArrow                          nextBtn;
 
     /* Diagramm */
     PressureGraph graph;
@@ -51,7 +55,7 @@ private:
     /* Statuszeile */
     touchgfx::Box                     statusBg;
     touchgfx::TextAreaWithOneWildcard statusText;
-    touchgfx::Unicode::UnicodeChar    statusBuf[32];
+    touchgfx::Unicode::UnicodeChar    statusBuf[40];
 
     /* Y-Achsen-Beschriftung (0, 50, 100, 150, 200, 250, 300 mmH2O) */
     static const int YLABEL_COUNT = 7;
@@ -59,6 +63,7 @@ private:
     touchgfx::Unicode::UnicodeChar    yLabelBuf[YLABEL_COUNT][6];
 
     float lastSetpoint_;
+    float lastPwm_;
 
     touchgfx::TypedText dummyTypedText() const;
     static uint16_t writeStr(touchgfx::Unicode::UnicodeChar* buf, uint16_t size,
@@ -66,6 +71,9 @@ private:
     /* Konvertiert int zu ASCII in buf, gibt neue pos zurueck */
     static uint16_t writeInt(touchgfx::Unicode::UnicodeChar* buf, uint16_t size,
                              int value, uint16_t pos = 0);
+    /* Wie writeInt(), aber mit fuehrenden Nullen auf feste Breite aufgefuellt */
+    static uint16_t writeIntPadded(touchgfx::Unicode::UnicodeChar* buf, uint16_t size,
+                             int value, uint16_t width, uint16_t pos = 0);
 };
 
 #endif // SCREEN2VIEW_HPP

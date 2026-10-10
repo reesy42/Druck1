@@ -18,7 +18,8 @@ static int freqMHz;
 Model::Model() : modelListener(0),
                  pressureMmh2o_(0.0f), tempDegC_(0.0f), pidOutput_(0.0f),
                  pidKp_((float)g_pid_kp), pidKi_((float)g_pid_ki),
-                 pidKd_((float)g_pid_kd), pidSetpoint_((float)g_pid_setpoint)
+                 pidKd_((float)g_pid_kd), pidSetpoint_((float)g_pid_setpoint),
+                 pressureMax_(0.0f), pressureMin_(0.0f), pressureMinMaxValid_(false)
 {
 #ifndef SIMULATOR
     lastUs  = touchgfx::HAL::getInstance()->getCPUCycles();
@@ -63,6 +64,19 @@ void Model::tick()
     pidOutput_     = g_pid_output;
 #endif
 
+    /* pmax/pmin nachfuehren */
+    if (!pressureMinMaxValid_)
+    {
+        pressureMax_ = pressureMmh2o_;
+        pressureMin_ = pressureMmh2o_;
+        pressureMinMaxValid_ = true;
+    }
+    else
+    {
+        if (pressureMmh2o_ > pressureMax_) pressureMax_ = pressureMmh2o_;
+        if (pressureMmh2o_ < pressureMin_) pressureMin_ = pressureMmh2o_;
+    }
+
     if (currentTime.seconds != previousTime.seconds)
     {
         if (modelListener)
@@ -76,6 +90,7 @@ void Model::tick()
                                + currentTime.minutes * 60000u
                                + currentTime.seconds * 1000u
                                + currentTime.milliseconds);
+        modelListener->pwmUpdated(pidOutput_);
         modelListener->pressureUpdated(pressureMmh2o_, ms);
     }
 }

@@ -23,9 +23,14 @@ public:
     /* Navigation zu Screen2 – Implementierung in FrontendApplication.cpp */
     void gotoScreen2ScreenNoTransition();
 
+    /* Navigation zu Screen3 (pmax/pmin) – rein user-seitig, kein Designer-Screen */
+    void gotoScreen3ScreenNoTransition();
+
 private:
     void gotoScreen2Impl();
     touchgfx::Callback<FrontendApplication> screen2TransCallback;
+    void gotoScreen3Impl();
+    touchgfx::Callback<FrontendApplication> screen3TransCallback;
 };
 
 #endif // FRONTENDAPPLICATION_HPP

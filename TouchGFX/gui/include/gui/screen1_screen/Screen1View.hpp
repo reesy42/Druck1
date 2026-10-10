@@ -3,6 +3,7 @@
 
 #include <gui_generated/screen1_screen/Screen1ViewBase.hpp>
 #include <gui/screen1_screen/Screen1Presenter.hpp>
+#include <gui/common/NavArrow.hpp>
 #include <touchgfx/widgets/Box.hpp>
 #include <touchgfx/widgets/TextAreaWithWildcard.hpp>
 
@@ -70,10 +71,14 @@ private:
     /* ---- Rechter Panel-Hintergrund ---- */
     touchgfx::Box                     rightBg;
 
-    /* ---- Navigations-Button -> Screen2 ---- */
-    touchgfx::Box                     graphBtn;
-    touchgfx::TextAreaWithOneWildcard graphBtnLabel;
-    touchgfx::Unicode::UnicodeChar    graphBtnBuf[16];
+    /* ---- Navigations-Button ">" -> Screen2 ---- */
+    NavArrow                          nextBtn;
+
+    /* ---- Start/Stop-Button (Luefter) ---- */
+    touchgfx::Box                     startStopBtn;
+    touchgfx::TextAreaWithOneWildcard startStopBtnLabel;
+    touchgfx::Unicode::UnicodeChar    startStopBtnBuf[8];
+    bool                               fanRunning;
 
     /* ---- Speichern-Button ---- */
     touchgfx::Box                     saveBtn;
@@ -96,8 +101,10 @@ private:
     void buildParamPanel();
     void buildNumpad();
     void buildIstSollLines();
-    void buildGraphButton();
+    void buildNextButton();
     void buildSaveButton();
+    void buildStartStopButton();
+    void updateStartStopButton();
     void showInfo(const char* msg);
     void updateSollLine();
     void refreshValueDisplay(int id);

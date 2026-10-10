@@ -18,12 +18,14 @@ class PressureGraph : public touchgfx::Widget
 public:
     static const float PMIN;      //    0.0 mmH2O Y-Achse Minimum
     static const float PMAX;      //  300.0 mmH2O Y-Achse Maximum
+    static const float PWMIN;     //    0.0 %  PWM-Achse Minimum
+    static const float PWMAX;     //  100.0 %  PWM-Achse Maximum
     static const int   MAX_SAMPLES = 430;
 
     PressureGraph();
 
-    /** Neuen Messwert hinzufuegen und Widget aktualisieren. */
-    void addSample(float pressure_mmh2o);
+    /** Neuen Messwert (Druck + PWM-Tastgrad) hinzufuegen und Widget aktualisieren. */
+    void addSample(float pressure_mmh2o, float pwm_percent);
 
     /** Alle Samples und Zeitbasis zuruecksetzen. */
     void reset();
@@ -33,6 +35,7 @@ public:
 
 private:
     float   samples_[MAX_SAMPLES];
+    float   pwmSamples_[MAX_SAMPLES];
     int16_t head_;      // Index des naechsten freien Platzes (Ringpuffer)
     int16_t count_;     // Anzahl gueltige Samples
     uint32_t timeMs_;   // Gesamtzeit seit Reset in ms
@@ -40,6 +43,7 @@ private:
     uint16_t colorBg_;
     uint16_t colorGrid_;
     uint16_t colorLine_;
+    uint16_t colorPwm_;
     uint16_t colorSetpoint_;
     float    setpoint_;
 

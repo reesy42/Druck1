@@ -7,22 +7,29 @@ static const uint32_t SAMPLE_INTERVAL_MS = 40u;
 
 const float PressureGraph::PMIN =    0.0f;
 const float PressureGraph::PMAX =  300.0f;
+const float PressureGraph::PWMIN =   0.0f;
+const float PressureGraph::PWMAX = 100.0f;
 
 PressureGraph::PressureGraph()
     : head_(0), count_(0), timeMs_(0),
       colorBg_(touchgfx::Color::getColorFromRGB(10, 10, 40)),
       colorGrid_(touchgfx::Color::getColorFromRGB(40, 40, 80)),
       colorLine_(touchgfx::Color::getColorFromRGB(0, 220, 80)),
+      colorPwm_(touchgfx::Color::getColorFromRGB(255, 60, 220)),
       colorSetpoint_(touchgfx::Color::getColorFromRGB(220, 80, 0)),
       setpoint_(50.0f)
 {
     for (int i = 0; i < MAX_SAMPLES; ++i)
-        samples_[i] = 0.0f;
+    {
+        samples_[i]    = 0.0f;
+        pwmSamples_[i] = 0.0f;
+    }
 }
 
-void PressureGraph::addSample(float pressure_mmh2o)
+void PressureGraph::addSample(float pressure_mmh2o, float pwm_percent)
 {
-    samples_[head_] = pressure_mmh2o;
+    samples_[head_]    = pressure_mmh2o;
+    pwmSamples_[head_] = pwm_percent;
     head_ = (head_ + 1) % MAX_SAMPLES;
     if (count_ < MAX_SAMPLES)
         ++count_;
@@ -36,7 +43,10 @@ void PressureGraph::reset()
     count_  = 0;
     timeMs_ = 0;
     for (int i = 0; i < MAX_SAMPLES; ++i)
-        samples_[i] = 0.0f;
+    {
+        samples_[i]    = 0.0f;
+        pwmSamples_[i] = 0.0f;
+    }
     invalidate();
 }
 
@@ -109,6 +119,26 @@ void PressureGraph::draw(const touchgfx::Rect& /*invalidatedArea*/) const
 
     int16_t xBase = ax + (W - numDraw);  // linker Startpixel der Kurve
 
+    /* --- PWM-Kurve (0-100%, auf volle Grafikhoehe skaliert) --- */
+    float   prevPwm  = pwmSamples_[startIdx];
+    int16_t prevPwmY = ay + H - 1 - (int16_t)(((prevPwm - PWMIN) / (PWMAX - PWMIN)) * (H - 1));
+    if (prevPwmY < ay)      prevPwmY = ay;
+    if (prevPwmY >= ay + H) prevPwmY = ay + H - 1;
+
+    for (int16_t i = 1; i < numDraw; ++i)
+    {
+        int   idx    = (startIdx + i) % MAX_SAMPLES;
+        float pwm    = pwmSamples_[idx];
+        int16_t cy   = ay + H - 1 - (int16_t)(((pwm - PWMIN) / (PWMAX - PWMIN)) * (H - 1));
+        if (cy < ay)      cy = ay;
+        if (cy >= ay + H) cy = ay + H - 1;
+
+        int16_t cx = xBase + i;
+        drawVLine(cx, prevPwmY, cy, colorPwm_);
+        prevPwmY = cy;
+    }
+
+    /* --- Messwert-Kurve (Ist-Druck), zuletzt gezeichnet damit sie oben liegt --- */
     for (int16_t i = 1; i < numDraw; ++i)
     {
         int   idx  = (startIdx + i) % MAX_SAMPLES;
