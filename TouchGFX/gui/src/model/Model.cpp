@@ -3,6 +3,9 @@
 #include <touchgfx/hal/HAL.hpp>
 #include "main.h"
 #include "pid.h"
+#ifndef SIMULATOR
+#include "esc_telem.h"
+#endif
 
 #ifdef SIMULATOR
 #include <ctime>
@@ -19,7 +22,8 @@ Model::Model() : modelListener(0),
                  pressureMmh2o_(0.0f), tempDegC_(0.0f), pidOutput_(0.0f),
                  pidKp_((float)g_pid_kp), pidKi_((float)g_pid_ki),
                  pidKd_((float)g_pid_kd), pidSetpoint_((float)g_pid_setpoint),
-                 pressureMax_(0.0f), pressureMin_(0.0f), pressureMinMaxValid_(false)
+                 pressureMax_(0.0f), pressureMin_(0.0f), pressureMinMaxValid_(false),
+                 fanRpm_(-1), escTempC_(-128), escVoltage_cV_(-1), escCurrent_cA_(-1)
 {
 #ifndef SIMULATOR
     lastUs  = touchgfx::HAL::getInstance()->getCPUCycles();
@@ -62,6 +66,21 @@ void Model::tick()
     pressureMmh2o_ = g_pressure_mmh2o;
     tempDegC_      = g_temp_degc;
     pidOutput_     = g_pid_output;
+    EscTelem_Data esc;
+    if (EscTelem_GetData(&esc))
+    {
+        fanRpm_        = (int32_t)(esc.erpm / (ESC_TELEM_MOTOR_POLES / 2U));
+        escTempC_      = esc.temp_c;
+        escVoltage_cV_ = esc.voltage_cV;
+        escCurrent_cA_ = esc.current_cA;
+    }
+    else
+    {
+        fanRpm_        = -1;
+        escTempC_      = -128;
+        escVoltage_cV_ = -1;
+        escCurrent_cA_ = -1;
+    }
 #endif
 
     /* pmax/pmin nachfuehren */

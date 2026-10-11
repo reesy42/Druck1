@@ -15,6 +15,10 @@ static const uint16_t S3_BTN_ACT   = touchgfx::Color::getColorFromRGB( 70, 130, 
 static const uint16_t S3_PMAX      = touchgfx::Color::getColorFromRGB(255,  90,  90);
 static const uint16_t S3_PMIN      = touchgfx::Color::getColorFromRGB( 90, 170, 255);
 static const uint16_t S3_IST       = touchgfx::Color::getColorFromRGB(  0, 220, 120);
+static const uint16_t S3_RPM       = touchgfx::Color::getColorFromRGB(230, 200,  60);
+static const uint16_t S3_TEMP      = touchgfx::Color::getColorFromRGB(240, 140,  60);
+static const uint16_t S3_VOLT      = touchgfx::Color::getColorFromRGB(180, 140, 255);
+static const uint16_t S3_CURR      = touchgfx::Color::getColorFromRGB( 80, 210, 220);
 static const uint16_t S3_RESET     = touchgfx::Color::getColorFromRGB(120,  40,  20);
 static const uint16_t S3_RESET_ACT = touchgfx::Color::getColorFromRGB(200,  80,  40);
 
@@ -60,10 +64,31 @@ void Screen3View::setValue(int row, float value_mmh2o)
     rowValue[row].invalidate();
 }
 
+/* Schreibt "12.34 <unit>" aus einem Wert in Hundertsteln, negativ -> "--- <unit>" */
+void Screen3View::setFixed2(int row, int32_t hundredths, const char* unit)
+{
+    uint16_t pos;
+    if (hundredths < 0)
+    {
+        pos = writeStr(rowValueBuf[row], VAL_BUF, "---");
+    }
+    else
+    {
+        pos = writeInt(rowValueBuf[row], VAL_BUF, (int)(hundredths / 100));
+        if (pos < VAL_BUF - 1) rowValueBuf[row][pos++] = '.';
+        if (pos < VAL_BUF - 1) rowValueBuf[row][pos++] = '0' + (hundredths / 10) % 10;
+        if (pos < VAL_BUF - 1) rowValueBuf[row][pos++] = '0' + hundredths % 10;
+    }
+    pos = writeStr(rowValueBuf[row], VAL_BUF, " ", pos);
+    writeStr(rowValueBuf[row], VAL_BUF, unit, pos);
+    rowValue[row].invalidate();
+}
+
 /* -----------------------------------------------------------------------
  * Konstruktor
  * --------------------------------------------------------------------- */
-Screen3View::Screen3View() : resetHighlighted_(false) {}
+Screen3View::Screen3View() : resetHighlighted_(false), lastRpm_(-2), lastTempC_(-129),
+                             lastVoltage_cV_(-2), lastCurrent_cA_(-2) {}
 
 /* -----------------------------------------------------------------------
  * setupScreen
@@ -91,41 +116,49 @@ void Screen3View::setupScreen()
     titleText.setColor(S3_TEXT);
     titleText.setWildcard(titleBuf);
     titleText.setTypedText(dummyTypedText());
-    writeStr(titleBuf, 16, "Extremwerte");
+    writeStr(titleBuf, 16, "Messwerte");
     add(titleText);
 
-    /* ---- Werte-Zeilen: pmax, pmin, Ist ---- */
-    const char*    labels[ROW_COUNT] = { "pmax:", "pmin:", "Ist:" };
-    const uint16_t colors[ROW_COUNT] = { S3_PMAX, S3_PMIN, S3_IST };
+    /* ---- Werte-Zeilen: links Druck (pmax, pmin, Ist), rechts ESC (Rot, t, U, I) ---- */
+    const char*    labels[ROW_COUNT] = { "pmax:", "pmin:", "Ist:", "Rot:", "t:", "U:", "I:" };
+    const uint16_t colors[ROW_COUNT] = { S3_PMAX, S3_PMIN, S3_IST, S3_RPM, S3_TEMP, S3_VOLT, S3_CURR };
+    const char*    empty[ROW_COUNT]  = { "--- mmH2O", "--- mmH2O", "--- mmH2O",
+                                         "--- rpm", "--- C", "--- V", "--- A" };
     for (int i = 0; i < ROW_COUNT; ++i)
     {
-        int16_t y = (int16_t)(45 + i * 45);
+        const bool    right  = (i >= ROW_RPM);
+        const int16_t slot   = (int16_t)(right ? i - ROW_RPM : i);
+        /* links breiter: "-123.4 mmH2O" braucht in Verdana 20 ~160 px */
+        const int16_t x      = right ? 272 : 4;
+        const int16_t w      = right ? 204 : 262;
+        const int16_t labelW = right ? 44 : 70;
+        const int16_t y      = (int16_t)(36 + slot * 42);
 
-        rowBg[i].setPosition(60, y, SCREEN_W - 120, 38);
+        rowBg[i].setPosition(x, y, w, 36);
         rowBg[i].setColor(S3_ROW_BG);
         add(rowBg[i]);
 
-        rowLabel[i].setPosition(80, y + 8, 90, 24);
+        rowLabel[i].setPosition(x + 8, y + 6, labelW, 24);
         rowLabel[i].setColor(colors[i]);
         rowLabel[i].setWildcard(rowLabelBuf[i]);
         rowLabel[i].setTypedText(dummyTypedText());
-        writeStr(rowLabelBuf[i], 8, labels[i]);
+        writeStr(rowLabelBuf[i], 12, labels[i]);
         add(rowLabel[i]);
 
-        rowValue[i].setPosition(180, y + 8, 220, 24);
+        rowValue[i].setPosition(x + 8 + labelW, y + 6, w - 16 - labelW, 24);
         rowValue[i].setColor(colors[i]);
         rowValue[i].setWildcard(rowValueBuf[i]);
         rowValue[i].setTypedText(dummyTypedText());
-        writeStr(rowValueBuf[i], VAL_BUF, "--- mmH2O");
+        writeStr(rowValueBuf[i], VAL_BUF, empty[i]);
         add(rowValue[i]);
     }
 
-    /* ---- Reset-Button ---- */
-    resetBtn.setPosition(160, 200, 160, 50);
+    /* ---- Reset-Button (setzt nur pmax/pmin zurueck) ---- */
+    resetBtn.setPosition(160, 208, 160, 46);
     resetBtn.setColor(S3_RESET);
     add(resetBtn);
 
-    resetLabel.setPosition(160 + 45, 200 + 14, 110, 24);
+    resetLabel.setPosition(160 + 45, 208 + 11, 110, 24);
     resetLabel.setColor(touchgfx::Color::getColorFromRGB(240, 240, 240));
     resetLabel.setWildcard(resetLabelBuf);
     resetLabel.setTypedText(dummyTypedText());
@@ -143,9 +176,9 @@ void Screen3View::tearDownScreen()
  * --------------------------------------------------------------------- */
 void Screen3View::onPressureUpdated(float pressure_mmh2o, float pmin_mmh2o, float pmax_mmh2o)
 {
-    setValue(0, pmax_mmh2o);
-    setValue(1, pmin_mmh2o);
-    setValue(2, pressure_mmh2o);
+    setValue(ROW_PMAX, pmax_mmh2o);
+    setValue(ROW_PMIN, pmin_mmh2o);
+    setValue(ROW_IST,  pressure_mmh2o);
 
     /* Reset-Button nach Druck wieder in Normalfarbe */
     if (resetHighlighted_)
@@ -153,6 +186,43 @@ void Screen3View::onPressureUpdated(float pressure_mmh2o, float pmin_mmh2o, floa
         resetHighlighted_ = false;
         resetBtn.setColor(S3_RESET);
         resetBtn.invalidate();
+    }
+}
+
+/* -----------------------------------------------------------------------
+ * onEscUpdated  — "1234 rpm" / "45 C" / "24.10 V" / "1.23 A", "---" ohne Telemetrie
+ * (Font hat kein Grad-Zeichen)
+ * --------------------------------------------------------------------- */
+void Screen3View::onEscUpdated(int32_t rpm, int32_t tempC, int32_t voltage_cV, int32_t current_cA)
+{
+    if (voltage_cV != lastVoltage_cV_)
+    {
+        lastVoltage_cV_ = voltage_cV;
+        setFixed2(ROW_VOLT, voltage_cV, "V");
+    }
+
+    if (current_cA != lastCurrent_cA_)
+    {
+        lastCurrent_cA_ = current_cA;
+        setFixed2(ROW_CURR, current_cA, "A");
+    }
+
+    if (rpm != lastRpm_)
+    {
+        lastRpm_ = rpm;
+        uint16_t pos = (rpm < 0) ? writeStr(rowValueBuf[ROW_RPM], VAL_BUF, "---")
+                                 : writeInt(rowValueBuf[ROW_RPM], VAL_BUF, (int)rpm);
+        writeStr(rowValueBuf[ROW_RPM], VAL_BUF, " rpm", pos);
+        rowValue[ROW_RPM].invalidate();
+    }
+
+    if (tempC != lastTempC_)
+    {
+        lastTempC_ = tempC;
+        uint16_t pos = (tempC == -128) ? writeStr(rowValueBuf[ROW_TEMP], VAL_BUF, "---")
+                                       : writeInt(rowValueBuf[ROW_TEMP], VAL_BUF, (int)tempC);
+        writeStr(rowValueBuf[ROW_TEMP], VAL_BUF, " C", pos);
+        rowValue[ROW_TEMP].invalidate();
     }
 }
 

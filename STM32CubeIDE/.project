@@ -499,6 +499,11 @@
 			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/scope_out.c</locationURI>
 		</link>
 		<link>
+			<name>Application/User/Core/esc_telem.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/esc_telem.c</locationURI>
+		</link>
+		<link>
 			<name>Application/User/Core/flash_params.c</name>
 			<type>1</type>
 			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/flash_params.c</locationURI>

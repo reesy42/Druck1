@@ -9,6 +9,8 @@ void Screen3Presenter::deactivate() {}
 void Screen3Presenter::pressureUpdated(float pressure_mmh2o, uint32_t /*time_ms*/)
 {
     view.onPressureUpdated(pressure_mmh2o, model->getPressureMin(), model->getPressureMax());
+    view.onEscUpdated(model->getFanRpm(), model->getEscTempC(),
+                      model->getEscVoltage_cV(), model->getEscCurrent_cA());
 }
 
 void Screen3Presenter::resetMinMax()
