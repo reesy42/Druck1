@@ -3,7 +3,8 @@
 
 /* ---------------------------------------------------------------------------
  * Unidirektionales DShot600 (Sendeseite) auf PA15 (Arduino D9), TIM2_CH1 (AF1),
- * DMA1 Stream5 Kanal 3. Keine Telemetrie (keine eRPM-Rueckmeldung).
+ * DMA1 Stream5 Kanal 3. Keine Bidir-Telemetrie; das Telemetrie-Bit fordert
+ * nur das KISS-Paket am separaten Telemetrie-Pad an (siehe esc_telem.c).
  *
  * TIM2 haengt an APB1, Timertakt 108 MHz:
  *   Bitzeit = 1 / 600 kHz = 1.667 us  ->  180 Ticks   => PSC = 0, ARR = 179
@@ -26,6 +27,12 @@
 
 #define DSHOT_FRAME_BITS   16
 #define DSHOT_BUF_LEN     (DSHOT_FRAME_BITS + 2)
+
+/* Telemetrie-Bit nur in jedem N-ten Frame setzen: Ein KISS-Paket braucht bei
+ * 115200 Baud ~0,87 ms. Bei Anforderung in jedem Frame (1 kHz) kaemen die
+ * Pakete lueckenlos hintereinander und waeren nicht mehr voneinander zu
+ * trennen. 1 kHz / 10 = 100 Hz -> ~9 ms Pause zwischen den Paketen. */
+#define DSHOT_TELEM_DIVIDER 10U
 
 #define DSHOT_MIN_THROTTLE  48U
 #define DSHOT_MAX_THROTTLE  2047U
@@ -156,7 +163,14 @@ void DShot_SendRaw(uint16_t value)
     return;
   }
 
-  uint16_t frame = DShot_MakeFrame(value, 1U);
+  static uint8_t telemCnt = 0U;
+  uint8_t telemetry = (telemCnt == 0U) ? 1U : 0U;
+  if (++telemCnt >= DSHOT_TELEM_DIVIDER)
+  {
+    telemCnt = 0U;
+  }
+
+  uint16_t frame = DShot_MakeFrame(value, telemetry);
 
   for (int i = 0; i < DSHOT_FRAME_BITS; ++i)
   {

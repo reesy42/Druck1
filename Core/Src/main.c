@@ -30,6 +30,7 @@
 #include "flash_params.h"
 #include "dshot.h"
 #include "scope_out.h"
+#include "esc_telem.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -227,6 +228,7 @@ int main(void)
   HAL_Delay(500);//Warte bis sensor ready
   Sensor_Init();
   DShot_Init();
+  EscTelem_Init();   /* ESC-Telemetrie: D0 = PC7, USART6_RX 115200 (esc_telem.h) */
   ScopeOut_Init();   /* Oszi-Monitor: D3 = Druck, D6 = Stellwert (scope_out.h) */
   /* PID-Parameter aus Flash laden (Fallback: Defaults) */
   FlashParams_Load((float*)&g_pid_kp, (float*)&g_pid_ki,
@@ -811,6 +813,15 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(MCU_ACTIVE_GPIO_Port, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
+  /* PC7 (D0) ist laut .ioc noch der TouchGFX-Debugausgang FRAME_RATE, wird
+   * aber fuer die ESC-Telemetrie (USART6_RX) gebraucht. Sofort auf Eingang mit
+   * Pull-up schalten, damit der Pin nicht bis EscTelem_Init() gegen den
+   * Telemetrie-Ausgang des ESC treibt. TouchGFXGPIO schreibt weiterhin ins
+   * ODR-Bit, das wirkt im Eingangs-/AF-Modus nicht auf den Pin. */
+  GPIO_InitStruct.Pin = FRAME_RATE_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(FRAME_RATE_GPIO_Port, &GPIO_InitStruct);
   /* USER CODE END MX_GPIO_Init_2 */
 }
 

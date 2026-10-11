@@ -16,8 +16,8 @@
  *
  * Layout (480 x 272):
  *   y=  0..29  : Header ("<"-Button + Titel)
- *   y= 45..175 : pmax / pmin / Ist
- *   y=200..250 : Reset-Button
+ *   y= 34..199 : pmax / pmin / Ist / Drehzahl / ESC-Temp
+ *   y=208..253 : Reset-Button
  */
 class Screen3View : public touchgfx::View<Screen3Presenter>
 {
@@ -28,6 +28,7 @@ public:
     virtual void tearDownScreen();
 
     void onPressureUpdated(float pressure_mmh2o, float pmin_mmh2o, float pmax_mmh2o);
+    void onEscUpdated(int32_t rpm, int32_t tempC);   /* -1 / -128 = keine gueltige Telemetrie */
 
     virtual void handleClickEvent(const touchgfx::ClickEvent& evt);
 
@@ -42,7 +43,7 @@ private:
     static const int16_t SCREEN_H = 272;
     static const int16_t HDR_H    = 30;
 
-    static const int ROW_COUNT = 3;          // pmax, pmin, Ist
+    enum Row { ROW_PMAX = 0, ROW_PMIN, ROW_IST, ROW_RPM, ROW_TEMP, ROW_COUNT };
     static const uint16_t VAL_BUF = 20;
 
     touchgfx::Box                     background;
@@ -56,7 +57,7 @@ private:
     /* Werte-Zeilen */
     touchgfx::Box                     rowBg[ROW_COUNT];
     touchgfx::TextAreaWithOneWildcard rowLabel[ROW_COUNT];
-    touchgfx::Unicode::UnicodeChar    rowLabelBuf[ROW_COUNT][8];
+    touchgfx::Unicode::UnicodeChar    rowLabelBuf[ROW_COUNT][12];
     touchgfx::TextAreaWithOneWildcard rowValue[ROW_COUNT];
     touchgfx::Unicode::UnicodeChar    rowValueBuf[ROW_COUNT][VAL_BUF];
 
@@ -65,6 +66,8 @@ private:
     touchgfx::TextAreaWithOneWildcard resetLabel;
     touchgfx::Unicode::UnicodeChar    resetLabelBuf[8];
     bool                              resetHighlighted_;  /* Button nach Druck kurz hervorgehoben */
+    int32_t                           lastRpm_;           /* nur bei Aenderung neu zeichnen */
+    int32_t                           lastTempC_;
 
     void setValue(int row, float value_mmh2o);
 

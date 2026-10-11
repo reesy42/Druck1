@@ -34,6 +34,11 @@ public:
     float getPressureMin() const { return pressureMin_; }
     void  resetPressureMinMax()  { pressureMinMaxValid_ = false; }
 
+    /* Aus der ESC-Telemetrie (KISS, esc_telem.c): Drehzahl in U/min (-1 = ungueltig),
+     * ESC-Temperatur in Grad C (-128 = ungueltig) */
+    int32_t getFanRpm() const { return fanRpm_; }
+    int32_t getEscTempC() const { return escTempC_; }
+
 protected:
     ModelListener* modelListener;
     Time currentTime;
@@ -49,6 +54,8 @@ private:
     float pressureMax_;
     float pressureMin_;
     bool  pressureMinMaxValid_;   /* false -> beim naechsten tick() mit aktuellem Druck neu starten */
+    int32_t fanRpm_;
+    int32_t escTempC_;
 };
 
 #endif // MODEL_HPP
