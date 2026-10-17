@@ -69,7 +69,7 @@ uint16_t Screen1View::buildFixed(touchgfx::Unicode::UnicodeChar* buf, uint16_t s
  * Konstruktor
  * --------------------------------------------------------------------- */
 Screen1View::Screen1View()
-    : activeParam(-1), inputLen(0), fanRunning(true), infoTicks(0)
+    : activeParam(-1), inputLen(0), fanRunning(g_fan_run != 0U), infoTicks(0)
 {
     paramValues[PARAM_KP]    = 2.0f;
     paramValues[PARAM_KI]    = 0.5f;
@@ -348,11 +348,10 @@ void Screen1View::applyInput()
     if (saved == PARAM_PSOLL)
         updateSollLine();
 
-    /* Bei gestopptem Luefter bleibt die Drehzahl auf 0, der editierte Sollwert
-       wird nur gemerkt und erst beim naechsten Start uebernommen. */
+    /* Bei gestopptem Luefter sendet der PID-Task DShot 0 (g_fan_run = 0);
+       der Sollwert wird trotzdem uebernommen und gilt ab dem naechsten Start. */
     presenter->setPidParams(paramValues[PARAM_KP], paramValues[PARAM_KI],
-                            paramValues[PARAM_KD],
-                            fanRunning ? paramValues[PARAM_PSOLL] : 0.0f);
+                            paramValues[PARAM_KD], paramValues[PARAM_PSOLL]);
 }
 
 /* -----------------------------------------------------------------------
@@ -406,10 +405,8 @@ void Screen1View::handleClickEvent(const touchgfx::ClickEvent& evt)
         {
             fanRunning = !fanRunning;
 
-            presenter->setPidParams(paramValues[PARAM_KP], paramValues[PARAM_KI],
-                                    paramValues[PARAM_KD],
-                                    fanRunning ? paramValues[PARAM_PSOLL] : 0.0f);
-            g_pid_enabled = 1;   // neuer Sollwert (0 oder Soll) wird vom PID-Task uebernommen
+            /* Stop = DShot MOTOR_STOP (Wert 0) statt nur Sollwert 0, siehe PID-Task in main.c */
+            g_fan_run = fanRunning ? 1U : 0U;
 
             updateStartStopButton();
             showInfo(fanRunning ? "Gestartet" : "Gestoppt");

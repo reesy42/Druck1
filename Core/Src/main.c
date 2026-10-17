@@ -161,6 +161,7 @@ volatile float   g_pid_setpoint = 50.0f;
 volatile float   g_pid_output   = 0.0f;
 volatile float   g_pid_dt       = 0.020f;  /* 20 ms Abtastzeit (fest) */
 volatile uint8_t g_pid_enabled  = 1;
+volatile uint8_t g_fan_run      = 1;       /* 0 = Stop: PID aus, ESC bekommt DShot 0 (MOTOR_STOP) */
 
 static PID_Handle_t pid;
 
@@ -955,9 +956,23 @@ void StartDefaultTask(void *argument)
                     (float)g_pid_setpoint);
       g_pid_enabled = 0;
     }
-    float out = PID_Compute(&pid, (float)g_pressure_mmh2o);
+    float out;
+    if (g_fan_run)
+    {
+      out = PID_Compute(&pid, (float)g_pressure_mmh2o);
+      DShot_SetPercent((uint8_t)out);   /* TIM5-ISR sendet mit 1 kHz */
+    }
+    else
+    {
+      /* Echter Stop: DShot-Wert 0 = MOTOR_STOP. DShot_SetPercent(0) wuerde
+       * dagegen Throttle 48 (Minimalschub) senden. Der ESC bleibt bei 0
+       * armed, ein Neustart braucht also keine erneute Armphase. PID-Reset,
+       * damit der Regler beim Start ohne aufgelaufenen I-Anteil anlaeuft. */
+      PID_Reset(&pid);
+      out = 0.0f;
+      DShot_SetRaw(0U);
+    }
     g_pid_output = out;
-    DShot_SetPercent((uint8_t)out);   /* TIM5-ISR sendet mit 1 kHz */
     ScopeOut_SetPressure((float)g_pressure_mmh2o);
     ScopeOut_SetOutput(out);
 

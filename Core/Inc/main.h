@@ -88,6 +88,7 @@ extern volatile float g_pid_setpoint;   /* Sollwert in mmH2O */
 extern volatile float g_pid_output;     /* Reglerausgang 0-100 % */
 extern volatile float g_pid_dt;         /* Abtastzeit in Sekunden */
 extern volatile uint8_t g_pid_enabled;
+extern volatile uint8_t g_fan_run;      /* 1 = Luefter laeuft (PID aktiv), 0 = DShot MOTOR_STOP */
 /* USER CODE END Private defines */
 
 /*------Testpin (Oszilloskop-Trigger, PI2)---------*/
